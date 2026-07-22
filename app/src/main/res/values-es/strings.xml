@@ -1,0 +1,24 @@
+<resources>
+    <string name="app_name">CalendarPro</string>
+
+    <string name="nav_calendar">Calendario</string>
+    <string name="nav_agenda">Agenda</string>
+    <string name="nav_settings">Ajustes</string>
+    <string name="nav_design">diseño</string>
+
+
+    <string name="month_view">Mes</string>
+    <string name="agenda_view">Agenda</string>
+    <string name="todays_focus">Enfoque de Hoy</string>
+    <string name="no_events">No hay eventos hoy</string>
+    <string name="new_event">Nuevo Evento</string>
+
+    <string name="preferences_title">Preferencias</string>
+    <string name="app_language">Idioma de App</string>
+    <string name="language_desc">Cambiar el idioma requiere reiniciar.</string>
+    <string name="format_preview">Vista Previa</string>
+    <string name="today_label">HOY</string>
+    <string name="date_format">Formato de Fecha</string>
+    <string name="start_week_on">Semana inicia en</string>
+    <string name="save_changes">Guardar Cambios</string>
+</resources>
