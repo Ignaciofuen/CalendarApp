@@ -272,59 +272,30 @@ class UpcomingEventsWidget : GlanceAppWidget() {
     }
 }
 
-// 3. RECEIVERS CON goAsync() PARA ACTUALIZACIÓN SEGURA
-// goAsync() extiende el tiempo de vida del receiver hasta que la coroutine termine,
-// evitando que el sistema mate el proceso antes de actualizar los widgets.
-
-private fun GlanceAppWidgetReceiver.safeWidgetUpdate(
-    context: Context, intent: Intent, widget: GlanceAppWidget, scheduleAlarm: Boolean = false
-) {
-    if (intent.action == AppWidgetManager.ACTION_APPWIDGET_UPDATE ||
-        intent.action == Intent.ACTION_DATE_CHANGED ||
-        intent.action == Intent.ACTION_TIMEZONE_CHANGED ||
-        intent.action == Intent.ACTION_TIME_CHANGED) {
-        val pendingResult = goAsync()
-        MainScope().launch {
-            try { widget.updateAll(context) }
-            catch (e: Exception) { e.printStackTrace() }
-            finally { pendingResult.finish() }
-        }
-        if (scheduleAlarm && intent.action == AppWidgetManager.ACTION_APPWIDGET_UPDATE) {
-            WidgetDailyUpdater.scheduleNextMidnight(context)
-        }
-    }
-}
+// 3. RECEIVERS — GlanceAppWidgetReceiver ya maneja la actualización en super.onReceive()
+// Solo agregamos lógica adicional cuando es necesario (ej: programar alarma de medianoche)
 
 class TodayCalendarWidgetReceiver : GlanceAppWidgetReceiver() {
     override val glanceAppWidget: GlanceAppWidget = TodayCalendarWidget()
     override fun onReceive(context: Context, intent: Intent) {
         super.onReceive(context, intent)
-        safeWidgetUpdate(context, intent, glanceAppWidget, scheduleAlarm = true)
+        // Programar alarma a medianoche cuando se añade el widget
+        if (intent.action == AppWidgetManager.ACTION_APPWIDGET_UPDATE) {
+            WidgetDailyUpdater.scheduleNextMidnight(context)
+        }
     }
 }
 
 class WeekCalendarWidgetReceiver : GlanceAppWidgetReceiver() {
     override val glanceAppWidget: GlanceAppWidget = WeekCalendarWidget()
-    override fun onReceive(context: Context, intent: Intent) {
-        super.onReceive(context, intent)
-        safeWidgetUpdate(context, intent, glanceAppWidget)
-    }
 }
 
 class MonthCalendarWidgetReceiver : GlanceAppWidgetReceiver() {
     override val glanceAppWidget: GlanceAppWidget = MonthCalendarWidget()
-    override fun onReceive(context: Context, intent: Intent) {
-        super.onReceive(context, intent)
-        safeWidgetUpdate(context, intent, glanceAppWidget)
-    }
 }
 
 class UpcomingEventsWidgetReceiver : GlanceAppWidgetReceiver() {
     override val glanceAppWidget: GlanceAppWidget = UpcomingEventsWidget()
-    override fun onReceive(context: Context, intent: Intent) {
-        super.onReceive(context, intent)
-        safeWidgetUpdate(context, intent, glanceAppWidget)
-    }
 }
 
 
