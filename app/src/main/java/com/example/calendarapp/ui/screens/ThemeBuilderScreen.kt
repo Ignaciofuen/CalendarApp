@@ -45,6 +45,7 @@ import com.example.calendarapp.ui.components.MarkerShape
 import com.example.calendarapp.ui.theme.*
 import com.example.calendarapp.ui.viewmodel.*
 import com.example.calendarapp.utils.AppStrings
+import kotlinx.coroutines.launch
 
 @OptIn(ExperimentalMaterial3Api::class, ExperimentalLayoutApi::class, ExperimentalFoundationApi::class)
 @Composable
@@ -60,6 +61,7 @@ fun ThemeBuilderScreen(
         val scrollState = rememberScrollState()
         val haptic = LocalHapticFeedback.current
         val context = LocalContext.current
+        val coroutineScope = rememberCoroutineScope()
 
         Scaffold(
             topBar = {
@@ -251,10 +253,14 @@ fun ThemeBuilderScreen(
                         contract = ActivityResultContracts.OpenDocument()
                     ) { uri: Uri? ->
                         uri?.let {
-                            try {
-                                context.contentResolver.takePersistableUriPermission(it, Intent.FLAG_GRANT_READ_URI_PERMISSION)
-                                viewModel.saveGlobalBackgroundImage(it.toString())
-                            } catch (e: Exception) { e.printStackTrace() }
+                            coroutineScope.launch {
+                                viewModel.deleteImageFromAppStorage(theme.globalBackgroundImage)
+                                val time = System.currentTimeMillis()
+                                val internalPath = viewModel.copyImageToAppStorage(it, "bg_global_$time.jpg")
+                                if (internalPath != null) {
+                                    viewModel.saveGlobalBackgroundImage(internalPath)
+                                }
+                            }
                         }
                     }
 
@@ -317,7 +323,10 @@ fun ThemeBuilderScreen(
                                 )
                             }
                             IconButton(
-                                onClick = { viewModel.saveGlobalBackgroundImage(null) },
+                                onClick = {
+                                    viewModel.deleteImageFromAppStorage(theme.globalBackgroundImage)
+                                    viewModel.saveGlobalBackgroundImage(null)
+                                },
                                 modifier = Modifier.align(Alignment.TopEnd).padding(6.dp)
                             ) {
                                 Box(
@@ -373,26 +382,35 @@ fun ThemeBuilderScreen(
                         verticalArrangement = Arrangement.spacedBy(8.dp)
                     ) {
                         (1..12).forEach { month ->
-                            val launcher = rememberLauncherForActivityResult(
-                                contract = ActivityResultContracts.OpenDocument()
-                            ) { uri: Uri? ->
-                                uri?.let {
-                                    try {
-                                        context.contentResolver.takePersistableUriPermission(it, Intent.FLAG_GRANT_READ_URI_PERMISSION)
-                                        viewModel.saveBackgroundImage(month, it.toString())
-                                    } catch (e: Exception) { e.printStackTrace() }
+                            key(month) {  // key() garantiza que cada launcher pertenezca al mes correcto
+                                val launcher = rememberLauncherForActivityResult(
+                                    contract = ActivityResultContracts.OpenDocument()
+                                ) { uri: Uri? ->
+                                    uri?.let {
+                                        coroutineScope.launch {
+                                            viewModel.deleteImageFromAppStorage(theme.backgroundImages[month])
+                                            val time = System.currentTimeMillis()
+                                            val internalPath = viewModel.copyImageToAppStorage(it, "bg_month_${month}_${time}.jpg")
+                                            if (internalPath != null) {
+                                                viewModel.saveBackgroundImage(month, internalPath)
+                                            }
+                                        }
+                                    }
                                 }
-                            }
-                            Box(modifier = Modifier.weight(1f).aspectRatio(1f)) {
-                                MonthBox(
-                                    month = month,
-                                    theme = theme,
-                                    lang = lang,
-                                    imageUri = theme.backgroundImages[month],
-                                    onDelete = { viewModel.saveBackgroundImage(month, null) },
-                                    onClick = { launcher.launch(arrayOf("image/*")) }
-                                )
-                            }
+                                Box(modifier = Modifier.weight(1f).aspectRatio(1f)) {
+                                    MonthBox(
+                                        month = month,
+                                        theme = theme,
+                                        lang = lang,
+                                        imageUri = theme.backgroundImages[month],
+                                        onDelete = {
+                                            viewModel.deleteImageFromAppStorage(theme.backgroundImages[month])
+                                            viewModel.saveBackgroundImage(month, null)
+                                        },
+                                        onClick = { launcher.launch(arrayOf("image/*")) }
+                                    )
+                                }
+                            }  // end key(month)
                         }
                     }
 

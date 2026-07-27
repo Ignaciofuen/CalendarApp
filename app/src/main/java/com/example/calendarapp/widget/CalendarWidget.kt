@@ -26,6 +26,8 @@ import androidx.glance.appwidget.action.actionStartActivity
 import androidx.glance.appwidget.cornerRadius
 import androidx.glance.appwidget.provideContent
 import androidx.glance.appwidget.updateAll
+import androidx.glance.currentState
+import androidx.datastore.preferences.core.longPreferencesKey
 import androidx.glance.background
 import androidx.glance.layout.*
 import androidx.glance.text.FontWeight
@@ -35,8 +37,12 @@ import androidx.glance.text.TextStyle
 import androidx.glance.unit.ColorProvider
 import com.example.calendarapp.MainActivity
 import com.example.calendarapp.data.local.AppDatabase
+import kotlinx.coroutines.Dispatchers
 import kotlinx.coroutines.MainScope
+import kotlinx.coroutines.async
 import kotlinx.coroutines.launch
+import kotlinx.coroutines.supervisorScope
+import kotlinx.coroutines.withContext
 import java.time.LocalDate
 import java.time.format.TextStyle as JavaTextStyle
 import java.util.Locale
@@ -56,22 +62,23 @@ data class WidgetEventData(
 
 class TodayCalendarWidget : GlanceAppWidget() {
     override suspend fun provideGlance(context: Context, id: GlanceId) {
-        val lang = getSavedLanguage(context)
-        val isSpanish = lang.contains("Español", ignoreCase = true)
-        val eventData = obtenerDatosDeEventos(context, isSpanish)
-        val backgroundUri = getSavedUri(context)
-        val accentColor = getSavedAccentColor(context)
-        val textColor = getSavedTextColor(context)
-        val cardOpacity = getSavedCardOpacity(context)
-        val showBg = getSavedShowBackgroundImages(context)
-        val locale = if (isSpanish) Locale("es", "ES") else Locale.ENGLISH
-
         provideContent {
+            val forceUpdate = currentState(androidx.datastore.preferences.core.longPreferencesKey("force_update_time"))
+            val lang = getSavedLanguage(context)
+            val isSpanish = lang.contains("Español", ignoreCase = true)
+            val eventData = kotlinx.coroutines.runBlocking { obtenerDatosDeEventos(context, isSpanish) }
+            val backgroundUri = getSavedUri(context)
+            val accentColor = getSavedAccentColor(context)
+            val textColor = getSavedTextColor(context)
+            val cardOpacity = getSavedCardOpacity(context)
+            val showBg = getSavedShowBackgroundImages(context)
+            val locale = if (isSpanish) java.util.Locale.forLanguageTag("es-ES") else java.util.Locale.ENGLISH
+
             val backgroundBitmap = if (showBg) loadCorrectedBitmap(context, backgroundUri) else null
             val mainIntent = Intent(context, MainActivity::class.java).apply {
-    flags = Intent.FLAG_ACTIVITY_NEW_TASK or Intent.FLAG_ACTIVITY_CLEAR_TOP or Intent.FLAG_ACTIVITY_SINGLE_TOP
-    putExtra("navigate_to_date", LocalDate.now().toString())
-}
+                flags = Intent.FLAG_ACTIVITY_NEW_TASK or Intent.FLAG_ACTIVITY_CLEAR_TOP or Intent.FLAG_ACTIVITY_SINGLE_TOP
+                putExtra("navigate_to_date", LocalDate.now().toString())
+            }
 
             Box(modifier = GlanceModifier.fillMaxSize().clickable(actionStartActivity(mainIntent))) {
                 WidgetBackground(backgroundBitmap)
@@ -89,37 +96,36 @@ class TodayCalendarWidget : GlanceAppWidget() {
 
 class WeekCalendarWidget : GlanceAppWidget() {
     override suspend fun provideGlance(context: Context, id: GlanceId) {
-        val lang = getSavedLanguage(context)
-        val isSpanish = lang.contains("Español", ignoreCase = true)
-        val startWeekOn = getSavedStartWeekOn(context)
-        val eventData = obtenerDatosDeEventos(context, isSpanish)
-        val backgroundUri = getSavedUri(context)
-        val accentColor = getSavedAccentColor(context)
-        val textColor = getSavedTextColor(context)
-        val cardOpacity = getSavedCardOpacity(context)
-        val showBg = getSavedShowBackgroundImages(context)
-        val locale = if (isSpanish) Locale("es", "ES") else Locale.ENGLISH
-
         provideContent {
+            val forceUpdate = currentState(androidx.datastore.preferences.core.longPreferencesKey("force_update_time"))
+            val lang = getSavedLanguage(context)
+            val isSpanish = lang.contains("Español", ignoreCase = true)
+            val startWeekOn = getSavedStartWeekOn(context)
+            val eventData = kotlinx.coroutines.runBlocking { obtenerDatosDeEventos(context, isSpanish) }
+            val backgroundUri = getSavedUri(context)
+            val accentColor = getSavedAccentColor(context)
+            val textColor = getSavedTextColor(context)
+            val cardOpacity = getSavedCardOpacity(context)
+            val showBg = getSavedShowBackgroundImages(context)
+            val locale = if (isSpanish) java.util.Locale.forLanguageTag("es-ES") else java.util.Locale.ENGLISH
+
             val backgroundBitmap = if (showBg) loadCorrectedBitmap(context, backgroundUri) else null
             val mainIntent = Intent(context, MainActivity::class.java).apply {
-    flags = Intent.FLAG_ACTIVITY_NEW_TASK or Intent.FLAG_ACTIVITY_CLEAR_TOP or Intent.FLAG_ACTIVITY_SINGLE_TOP
-    putExtra("navigate_to_date", LocalDate.now().toString())
-}
-
+                flags = Intent.FLAG_ACTIVITY_NEW_TASK or Intent.FLAG_ACTIVITY_CLEAR_TOP or Intent.FLAG_ACTIVITY_SINGLE_TOP
+                putExtra("navigate_to_date", LocalDate.now().toString())
+            }
+            
             Box(modifier = GlanceModifier.fillMaxSize().clickable(actionStartActivity(mainIntent))) {
                 WidgetBackground(backgroundBitmap)
-                val today = LocalDate.now()
-                // Respetamos la preferencia del usuario (Lunes o Domingo como inicio de semana)
-                val startOfWeek = if (startWeekOn == "Monday") {
-                    today.minusDays(today.dayOfWeek.value.toLong() - 1)
-                } else {
-                    // Domingo=7%7=0, Lunes=1%7=1, ..., Sábado=6%7=6
-                    today.minusDays((today.dayOfWeek.value % 7).toLong())
-                }
                 Column(modifier = GlanceModifier.fillMaxSize().padding(12.dp)) {
-                    Text("${today.month.getDisplayName(JavaTextStyle.FULL, locale).uppercase()} ${today.year}", style = TextStyle(color = ColorProvider(accentColor), fontSize = 12.sp, fontWeight = FontWeight.Bold))
-                    Spacer(modifier = GlanceModifier.height(8.dp))
+                    val today = LocalDate.now()
+                    // Respetamos la preferencia del usuario (Lunes o Domingo como inicio de semana)
+                    val startOfWeek = if (startWeekOn == "Monday") {
+                        today.minusDays(today.dayOfWeek.value.toLong() - 1)
+                    } else {
+                        // Domingo=7%7=0, Lunes=1%7=1, ..., Sábado=6%7=6
+                        today.minusDays((today.dayOfWeek.value % 7).toLong())
+                    }
                     Row(modifier = GlanceModifier.fillMaxWidth(), horizontalAlignment = Alignment.CenterHorizontally) {
                         for (i in 0..6) {
                             val currentDate = startOfWeek.plusDays(i.toLong())
@@ -146,23 +152,24 @@ class WeekCalendarWidget : GlanceAppWidget() {
 
 class MonthCalendarWidget : GlanceAppWidget() {
     override suspend fun provideGlance(context: Context, id: GlanceId) {
-        val lang = getSavedLanguage(context)
-        val isSpanish = lang.contains("Español", ignoreCase = true)
-        val startWeekOn = getSavedStartWeekOn(context)
-        val eventData = obtenerDatosDeEventos(context, isSpanish)
-        val backgroundUri = getSavedUri(context)
-        val accentColor = getSavedAccentColor(context)
-        val textColor = getSavedTextColor(context)
-        val cardOpacity = getSavedCardOpacity(context)
-        val showBg = getSavedShowBackgroundImages(context)
-        val locale = if (isSpanish) Locale("es", "ES") else Locale.ENGLISH
-
         provideContent {
+            val forceUpdate = currentState(androidx.datastore.preferences.core.longPreferencesKey("force_update_time"))
+            val lang = getSavedLanguage(context)
+            val isSpanish = lang.contains("Español", ignoreCase = true)
+            val startWeekOn = getSavedStartWeekOn(context)
+            val eventData = kotlinx.coroutines.runBlocking { obtenerDatosDeEventos(context, isSpanish) }
+            val backgroundUri = getSavedUri(context)
+            val accentColor = getSavedAccentColor(context)
+            val textColor = getSavedTextColor(context)
+            val cardOpacity = getSavedCardOpacity(context)
+            val showBg = getSavedShowBackgroundImages(context)
+            val locale = if (isSpanish) java.util.Locale.forLanguageTag("es-ES") else java.util.Locale.ENGLISH
+
             val backgroundBitmap = if (showBg) loadCorrectedBitmap(context, backgroundUri) else null
             val mainIntent = Intent(context, MainActivity::class.java).apply {
-    flags = Intent.FLAG_ACTIVITY_NEW_TASK or Intent.FLAG_ACTIVITY_CLEAR_TOP or Intent.FLAG_ACTIVITY_SINGLE_TOP
-    putExtra("navigate_to_date", LocalDate.now().toString())
-}
+                flags = Intent.FLAG_ACTIVITY_NEW_TASK or Intent.FLAG_ACTIVITY_CLEAR_TOP or Intent.FLAG_ACTIVITY_SINGLE_TOP
+                putExtra("navigate_to_date", LocalDate.now().toString())
+            }
 
             Box(modifier = GlanceModifier.fillMaxSize().clickable(actionStartActivity(mainIntent))) {
                 WidgetBackground(backgroundBitmap)
@@ -223,15 +230,15 @@ class MonthCalendarWidget : GlanceAppWidget() {
 
 class UpcomingEventsWidget : GlanceAppWidget() {
     override suspend fun provideGlance(context: Context, id: GlanceId) {
-        val lang = getSavedLanguage(context)
-        val isSpanish = lang.contains("Español", ignoreCase = true)
-        val eventData = obtenerDatosDeEventos(context, isSpanish)
-        val accentColor = getSavedAccentColor(context)
-        val textColor = getSavedTextColor(context)
-        val cardOpacity = getSavedCardOpacity(context)
-        val locale = if (isSpanish) Locale("es", "ES") else Locale.ENGLISH
-
         provideContent {
+            val forceUpdate = currentState(longPreferencesKey("force_update_time"))
+            val lang = getSavedLanguage(context)
+            val isSpanish = lang.contains("Español", ignoreCase = true)
+            val eventData = kotlinx.coroutines.runBlocking { obtenerDatosDeEventos(context, isSpanish) }
+            val accentColor = getSavedAccentColor(context)
+            val textColor = getSavedTextColor(context)
+            val locale = if (isSpanish) java.util.Locale.forLanguageTag("es-ES") else java.util.Locale.ENGLISH
+
             val mainIntent = Intent(context, MainActivity::class.java).apply {
                 flags = Intent.FLAG_ACTIVITY_NEW_TASK or Intent.FLAG_ACTIVITY_CLEAR_TOP or Intent.FLAG_ACTIVITY_SINGLE_TOP
                 putExtra("navigate_to_date", LocalDate.now().toString())
@@ -324,43 +331,87 @@ class UpcomingEventsWidgetReceiver : GlanceAppWidgetReceiver() {
 
 suspend fun obtenerDatosDeEventos(context: Context, isSpanish: Boolean = false): WidgetEventData {
     val noEventsText = if (isSpanish) "Sin eventos hoy" else "No events today"
-    return try {
-        val database = AppDatabase.getDatabase(context)
-        val dao = database.eventDao()
-        val today = LocalDate.now()
+    return withContext(Dispatchers.IO) {
+        try {
+            val database = AppDatabase.getDatabase(context)
+            val dao = database.eventDao()
+            val today = LocalDate.now()
 
-        // Fase 3: Solo cargamos lo necesario en vez de toda la DB
-        val monthStart = today.withDayOfMonth(1).toString()
-        val monthEnd = today.withDayOfMonth(today.lengthOfMonth()).toString()
+            val monthStart = today.withDayOfMonth(1)
+            val monthEnd   = today.withDayOfMonth(today.lengthOfMonth())
+            val futureEnd  = today.plusMonths(3)
 
-        // Eventos del mes actual (para indicadores en el calendario del widget)
-        val monthEvents = dao.getEventsByDateRangeSync(monthStart, monthEnd)
+            // ── 1. Eventos NO recurrentes en el rango ──────────────────────────
+            val nonRecurring = dao.getEventsByDateRangeSync(
+                monthStart.toString(), futureEnd.toString()
+            ).filter { it.recurrence == com.example.calendarapp.data.model.RecurrenceType.NONE }
 
-        // Próximos 5 eventos desde hoy (para el widget de upcoming)
-        val futureEnd = today.plusMonths(3).toString() // Ventana de 3 meses
-        val futureEvents = dao.getEventsByDateRangeSync(today.toString(), futureEnd)
+            // ── 2. Expandir eventos RECURRENTES virtualmente ───────────────────
+            val recurringBase = dao.getRecurringEventsSync()
+            val expandedRecurring = mutableListOf<com.example.calendarapp.data.model.CalendarEvent>()
 
-        val eventsCountMap = mutableMapOf<Int, Int>()
-        val eventDatesSet = mutableSetOf<LocalDate>()
-        var todayTitle = noEventsText; var todayTime = "--:--"; var found = false
+            for (event in recurringBase) {
+                fun nth(n: Long): LocalDate = when (event.recurrence) {
+                    com.example.calendarapp.data.model.RecurrenceType.DAILY   -> event.date.plusDays(n)
+                    com.example.calendarapp.data.model.RecurrenceType.WEEKLY  -> event.date.plusWeeks(n)
+                    com.example.calendarapp.data.model.RecurrenceType.MONTHLY -> event.date.plusMonths(n)
+                    com.example.calendarapp.data.model.RecurrenceType.YEARLY  -> event.date.plusYears(n)
+                    else -> event.date
+                }
+                // Incluir la instancia original si cae en el rango
+                if (!event.date.isBefore(monthStart) && !event.date.isAfter(futureEnd))
+                    expandedRecurring.add(event)
+                // Generar instancias hacia adelante
+                var n = 1L
+                while (true) {
+                    val d = nth(n)
+                    if (d.isAfter(futureEnd)) break
+                    if (!d.isBefore(monthStart)) expandedRecurring.add(event.copy(date = d))
+                    n++
+                }
+                // Generar instancias hacia atrás (para el mes actual)
+                n = -1L
+                while (true) {
+                    val d = nth(n)
+                    if (d.isBefore(monthStart)) break
+                    if (!d.isAfter(futureEnd)) expandedRecurring.add(event.copy(date = d))
+                    n--
+                }
+            }
 
-        for (event in monthEvents) {
-            eventDatesSet.add(event.date)
-            eventsCountMap[event.date.dayOfMonth] = eventsCountMap.getOrDefault(event.date.dayOfMonth, 0) + 1
-            if (!found && event.date == today) { todayTitle = event.title; todayTime = event.time; found = true }
-        }
+            // ── 3. Unificar y eliminar duplicados (mismo id + fecha) ───────────
+            val allEvents = (nonRecurring + expandedRecurring)
+                .distinctBy { "${it.id}_${it.date}" }
 
-        // También agregar fechas futuras al set (para cross-month en widget semanal)
-        for (event in futureEvents) { eventDatesSet.add(event.date) }
+            val eventsCountMap = mutableMapOf<Int, Int>()
+            val eventDatesSet  = mutableSetOf<LocalDate>()
+            var todayTitle = noEventsText; var todayTime = "--:--"; var found = false
 
-        val upcoming = futureEvents
-            .sortedWith(compareBy({ it.date }, { it.time }))
-            .take(5)
-            .map { WidgetUpcomingEvent(it.title, it.date, it.time) }
+            for (event in allEvents) {
+                if (!event.date.isBefore(monthStart) && !event.date.isAfter(monthEnd)) {
+                    eventDatesSet.add(event.date)
+                    eventsCountMap[event.date.dayOfMonth] =
+                        eventsCountMap.getOrDefault(event.date.dayOfMonth, 0) + 1
+                    if (!found && event.date == today) {
+                        todayTitle = event.title; todayTime = event.time; found = true
+                    }
+                }
+                // Fechas futuras también al set (indicadores en widget semanal)
+                if (event.date.isAfter(today) && !event.date.isAfter(futureEnd))
+                    eventDatesSet.add(event.date)
+            }
 
-        WidgetEventData(eventsCountMap, eventDatesSet, todayTitle, todayTime, upcoming)
-    } catch (e: Exception) { WidgetEventData(emptyMap(), emptySet(), noEventsText, "--:--") }
+            val upcoming = allEvents
+                .filter { !it.date.isBefore(today) && !it.date.isAfter(futureEnd) }
+                .sortedWith(compareBy({ it.date }, { it.time }))
+                .take(5)
+                .map { WidgetUpcomingEvent(it.title, it.date, it.time) }
+
+            WidgetEventData(eventsCountMap, eventDatesSet, todayTitle, todayTime, upcoming)
+        } catch (e: Exception) { WidgetEventData(emptyMap(), emptySet(), noEventsText, "--:--") }
+    }
 }
+
 
 fun getSavedLanguage(context: Context): String =
     context.getSharedPreferences("settings_preferences", Context.MODE_PRIVATE)
@@ -405,9 +456,19 @@ fun loadCorrectedBitmap(context: Context, uriString: String?): Bitmap? {
     return try {
         val uri = Uri.parse(uriString)
 
+        // Helper: abre stream desde content:// o file:// (almacenamiento interno)
+        fun openStream(): java.io.InputStream? {
+            return if (uri.scheme == "file") {
+                val path = uri.path ?: return null
+                java.io.FileInputStream(java.io.File(path))
+            } else {
+                context.contentResolver.openInputStream(uri)
+            }
+        }
+
         // 1. LEER LA ROTACIÓN ORIGINAL DE LA CÁMARA (EXIF)
         var rotation = 0f
-        context.contentResolver.openInputStream(uri)?.use { stream ->
+        openStream()?.use { stream ->
             val exif = androidx.exifinterface.media.ExifInterface(stream)
             val orientation = exif.getAttributeInt(
                 androidx.exifinterface.media.ExifInterface.TAG_ORIENTATION,
@@ -423,7 +484,7 @@ fun loadCorrectedBitmap(context: Context, uriString: String?): Bitmap? {
 
         // 2. OBTENER TAMAÑO SIN CARGAR EN MEMORIA (Anti-Crash)
         val options = BitmapFactory.Options().apply { inJustDecodeBounds = true }
-        context.contentResolver.openInputStream(uri)?.use { stream ->
+        openStream()?.use { stream ->
             BitmapFactory.decodeStream(stream, null, options)
         }
 
@@ -441,7 +502,7 @@ fun loadCorrectedBitmap(context: Context, uriString: String?): Bitmap? {
 
         // 4. CARGAR LA IMAGEN REDUCIDA
         val finalOptions = BitmapFactory.Options().apply { this.inSampleSize = inSampleSize }
-        val compressedBitmap = context.contentResolver.openInputStream(uri)?.use { stream ->
+        val compressedBitmap = openStream()?.use { stream ->
             BitmapFactory.decodeStream(stream, null, finalOptions)
         } ?: return null
 

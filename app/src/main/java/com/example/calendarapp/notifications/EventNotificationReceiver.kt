@@ -31,6 +31,7 @@ class EventNotificationReceiver : BroadcastReceiver() {
         // Intent para posponer 10 minutos
         val snoozeIntent = Intent("com.example.calendarapp.SNOOZE_EVENT").apply {
             setPackage(context.packageName)
+            action = "com.example.calendarapp.SNOOZE_EVENT.$id"  // Acción única por evento
             putExtra("event_title", title)
             putExtra("event_note", note)
             putExtra("event_id", id)
@@ -43,6 +44,7 @@ class EventNotificationReceiver : BroadcastReceiver() {
         // Intent para descartar
         val dismissIntent = Intent("com.example.calendarapp.DISMISS_EVENT").apply {
             setPackage(context.packageName)
+            action = "com.example.calendarapp.DISMISS_EVENT.$id"  // Acción única por evento
             putExtra("event_id", id)
         }
         val dismissPendingIntent = PendingIntent.getBroadcast(

@@ -57,7 +57,7 @@ fun EventDetailSheet(
         else null
     } ?: theme.accentColor
 
-    val locale = if (isSpanish) Locale("es", "ES") else Locale.ENGLISH
+    val locale = if (isSpanish) java.util.Locale.forLanguageTag("es-ES") else Locale.ENGLISH
 
     // Fecha formateada: "Lunes, 2 de Junio 2025" / "Monday, June 2, 2025"
     val dateFormatted = remember(event.date, lang) {

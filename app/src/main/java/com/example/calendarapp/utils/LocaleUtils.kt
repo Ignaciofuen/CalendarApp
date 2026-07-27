@@ -8,7 +8,7 @@ import java.util.Locale
 object LocaleUtils {
     fun updateLocale(context: Context, lang: String): ContextWrapper {
         val localeCode = if (lang.contains("Español", true)) "es" else "en"
-        val locale = Locale(localeCode)
+        val locale = java.util.Locale.forLanguageTag(localeCode)
         Locale.setDefault(locale)
 
         val config = context.resources.configuration

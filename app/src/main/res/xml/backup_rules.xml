@@ -1,13 +1,12 @@
-<?xml version="1.0" encoding="utf-8"?><!--
-   Sample backup rules file; uncomment and customize as necessary.
-   See https://developer.android.com/guide/topics/data/autobackup
-   for details.
-   Note: This file is ignored for devices older than API 31
-   See https://developer.android.com/about/versions/12/backup-restore
--->
+<?xml version="1.0" encoding="utf-8"?>
 <full-backup-content>
-    <!--
-   <include domain="sharedpref" path="."/>
-   <exclude domain="sharedpref" path="device.xml"/>
--->
+    <!-- Incluir preferencias de tema y ajustes -->
+    <include domain="sharedpref" path="theme_preferences"/>
+    <include domain="sharedpref" path="settings_preferences"/>
+    <!-- Incluir base de datos de eventos -->
+    <include domain="database" path="calendar_database"/>
+    <include domain="database" path="calendar_database-wal"/>
+    <include domain="database" path="calendar_database-shm"/>
+    <!-- Incluir imágenes de fondo copiadas al almacenamiento interno -->
+    <include domain="file" path="backgrounds"/>
 </full-backup-content>
