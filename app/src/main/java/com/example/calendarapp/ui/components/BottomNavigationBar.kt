@@ -61,6 +61,7 @@ fun BottomNavigationBar(
 
     val items = listOf(
         NavItem("calendar", Icons.Filled.DateRange,  Icons.Outlined.DateRange,  "calendar"),
+        @Suppress("DEPRECATION")
         NavItem("agenda",   Icons.Filled.List,       Icons.Outlined.List,       "schedule"),
         NavItem("design",   Icons.Filled.Face,       Icons.Outlined.Face,       "design"),
         NavItem("settings", Icons.Filled.Settings,   Icons.Outlined.Settings,   "settings")

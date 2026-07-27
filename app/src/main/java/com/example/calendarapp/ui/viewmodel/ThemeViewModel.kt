@@ -25,6 +25,10 @@ import kotlinx.coroutines.Dispatchers
 import kotlinx.coroutines.Job
 import kotlinx.coroutines.delay
 import kotlinx.coroutines.launch
+import kotlinx.coroutines.withContext
+import android.net.Uri
+import java.io.File
+import java.io.FileOutputStream
 
 enum class DayMarkerStyle {
     CLASSIC, SQUARE, SQUARE_FILLED, SPHERE_3D, MINIMAL, INSET
@@ -132,23 +136,20 @@ class ThemeViewModel(application: Application) : AndroidViewModel(application) {
         )
     }
 
-    // --- NOTIFICACIÓN DE WIDGETS (updateAll es el API correcto de Glance) ---
-    // NOTA: sendBroadcast con "android.appwidget.action.APPWIDGET_UPDATE" falla en
-    // Android 9+ porque es un broadcast protegido que solo el sistema puede emitir.
-    // --- NOTIFICACIÓN DE WIDGETS con DEBOUNCE ---
-    // Cada llamada cancela la anterior y espera 500ms. Solo se ejecuta la última,
-    // evitando reconstruir 4 widgets por cada pixel de slider.
+    // Debounce para actualización de widgets
+    // Evita reconstruir los widgets por cada cambio mínimo en el slider.
     private var widgetUpdateJob: Job? = null
-    private fun notifyWidgetUpdate() {
+    @OptIn(kotlinx.coroutines.DelicateCoroutinesApi::class)
+    private fun notifyWidgetUpdate(delayMs: Long = 500L) {
         widgetUpdateJob?.cancel()
-        widgetUpdateJob = viewModelScope.launch(Dispatchers.IO) {
-            delay(500L) // Debounce: espera 500ms sin más cambios
+        widgetUpdateJob = kotlinx.coroutines.GlobalScope.launch(Dispatchers.IO) {
+            if (delayMs > 0L) delay(delayMs)
             try {
                 val context = getApplication<Application>().applicationContext
-                TodayCalendarWidget().updateAll(context)
-                WeekCalendarWidget().updateAll(context)
-                MonthCalendarWidget().updateAll(context)
-                UpcomingEventsWidget().updateAll(context)
+                val intent = android.content.Intent(context, com.example.calendarapp.widget.WidgetDailyUpdater::class.java).apply {
+                    action = com.example.calendarapp.widget.WidgetDailyUpdater.ACTION_FORCE_UPDATE
+                }
+                context.sendBroadcast(intent)
             } catch (e: Exception) {
                 e.printStackTrace()
             }
@@ -187,8 +188,6 @@ class ThemeViewModel(application: Application) : AndroidViewModel(application) {
     fun isLightMode(): Boolean = prefs.getBoolean("isLightMode", false)
 
     fun saveGlobalBackgroundImage(uriString: String?) {
-        // FORZAMOS UN REFRESCO: Creamos una copia nueva del mapa aunque no cambie
-        // Esto es lo que "despierta" a Compose en todas las pestañas
         val refreshedImages = _currentTheme.value.backgroundImages.toMutableMap()
         _currentTheme.value = _currentTheme.value.copy(
             globalBackgroundImage = uriString,
@@ -360,6 +359,49 @@ class ThemeViewModel(application: Application) : AndroidViewModel(application) {
         _currentTheme.value = _currentTheme.value.copy(textShadowIntensity = value)
         prefs.edit().putFloat("textShadowIntensity", value).apply()
         notifyWidgetUpdate()
+    }
+
+    // ─── COPIA INTERNA DE IMÁGENES ────────────────────────────────────────────
+    /**
+     * Copia la imagen del URI externo (galería) a la carpeta privada de la app.
+     * Devuelve un URI file:// (ej: "file:///data/.../files/backgrounds/bg_global.jpg")
+     * compatible con Coil (AsyncImage) y contentResolver.openInputStream().
+     *
+     * @param uri URI externo (content://...) elegido por el usuario
+     * @param fileName Nombre único del archivo destino (ej: "bg_global.jpg", "bg_month_3.jpg")
+     * @return URI file:// como String, o null si falla la copia
+     */
+    suspend fun copyImageToAppStorage(uri: Uri, fileName: String): String? =
+        withContext(Dispatchers.IO) {
+            try {
+                val context = getApplication<Application>().applicationContext
+                val dir = File(context.filesDir, "backgrounds").apply { mkdirs() }
+                val dest = File(dir, fileName)
+                context.contentResolver.openInputStream(uri)?.use { input ->
+                    FileOutputStream(dest).use { output -> input.copyTo(output) }
+                }
+                // Devolver URI file:// en vez de path crudo — compatible con Coil y contentResolver
+                android.net.Uri.fromFile(dest).toString()
+            } catch (e: Exception) {
+                e.printStackTrace()
+                null
+            }
+        }
+
+    /**
+     * Elimina una imagen de la carpeta interna.
+     * Acepta tanto URI file:// como path absoluto.
+     */
+    fun deleteImageFromAppStorage(uriOrPath: String?) {
+        if (uriOrPath.isNullOrEmpty()) return
+        try {
+            val file = if (uriOrPath.startsWith("file://")) {
+                File(android.net.Uri.parse(uriOrPath).path ?: return)
+            } else {
+                File(uriOrPath)
+            }
+            if (file.exists() && file.parent?.contains("backgrounds") == true) file.delete()
+        } catch (e: Exception) { e.printStackTrace() }
     }
 }
 

@@ -7,8 +7,12 @@ import android.content.Context
 import android.content.Intent
 import android.os.Build
 import androidx.glance.appwidget.updateAll
-import kotlinx.coroutines.MainScope
+import kotlinx.coroutines.CoroutineScope
+import kotlinx.coroutines.Dispatchers
+import kotlinx.coroutines.SupervisorJob
+import kotlinx.coroutines.async
 import kotlinx.coroutines.launch
+import kotlinx.coroutines.supervisorScope
 import java.util.Calendar
 
 /**
@@ -25,23 +29,45 @@ class WidgetDailyUpdater : BroadcastReceiver() {
     override fun onReceive(context: Context, intent: Intent) {
         when (intent.action) {
             ACTION_MIDNIGHT_UPDATE,
+            ACTION_FORCE_UPDATE,
             Intent.ACTION_DATE_CHANGED,
             Intent.ACTION_TIME_CHANGED,
             Intent.ACTION_TIMEZONE_CHANGED,
             Intent.ACTION_BOOT_COMPLETED,
             "android.intent.action.QUICKBOOT_POWERON",   // HTC/Huawei boot
             "com.htc.intent.action.QUICKBOOT_POWERON" -> {
-                // goAsync() extiende el tiempo de vida del receiver
                 val pendingResult = goAsync()
-                MainScope().launch {
+                val job = SupervisorJob()
+                val scope = CoroutineScope(Dispatchers.Main + job)
+                scope.launch {
                     try {
-                        TodayCalendarWidget().updateAll(context)
-                        WeekCalendarWidget().updateAll(context)
-                        MonthCalendarWidget().updateAll(context)
-                        UpcomingEventsWidget().updateAll(context)
+                        val manager = androidx.glance.appwidget.GlanceAppWidgetManager(context)
+                        val forceKey = androidx.datastore.preferences.core.longPreferencesKey("force_update_time")
+                        
+                        supervisorScope {
+                            val widgets = listOf(
+                                TodayCalendarWidget(),
+                                WeekCalendarWidget(),
+                                MonthCalendarWidget(),
+                                UpcomingEventsWidget()
+                            )
+                            
+                            widgets.map { widget ->
+                                async {
+                                    val glanceIds = manager.getGlanceIds(widget.javaClass)
+                                    glanceIds.forEach { id ->
+                                        androidx.glance.appwidget.state.updateAppWidgetState(context, id) { prefs ->
+                                            prefs[forceKey] = System.currentTimeMillis()
+                                        }
+                                        widget.update(context, id)
+                                    }
+                                }
+                            }.forEach { it.await() }
+                        }
                     } catch (e: Exception) {
                         e.printStackTrace()
                     } finally {
+                        job.cancel()  // Libera el scope - sin memory leak
                         pendingResult.finish()
                     }
                 }
@@ -53,6 +79,7 @@ class WidgetDailyUpdater : BroadcastReceiver() {
 
     companion object {
         const val ACTION_MIDNIGHT_UPDATE = "com.example.calendarapp.MIDNIGHT_WIDGET_UPDATE"
+        const val ACTION_FORCE_UPDATE = "com.example.calendarapp.FORCE_WIDGET_UPDATE"
         private const val REQUEST_CODE = 9001
 
         /**

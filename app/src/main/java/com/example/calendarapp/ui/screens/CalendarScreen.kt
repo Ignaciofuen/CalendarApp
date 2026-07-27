@@ -70,7 +70,7 @@ fun CalendarScreen(
 
     key(lang, startWeekOn) {
         val currentLocale = remember(lang) {
-            if (lang.contains("Español", ignoreCase = true)) Locale("es", "ES") else Locale.ENGLISH
+            if (lang.contains("Español", ignoreCase = true)) java.util.Locale.forLanguageTag("es-ES") else java.util.Locale.ENGLISH
         }
 
         val events by calendarViewModel.events.collectAsState()
@@ -86,6 +86,9 @@ fun CalendarScreen(
         var showMonthMenu by remember { mutableStateOf(false) }
         var longPressDate by remember { mutableStateOf<java.time.LocalDate?>(null) }
         var conflictWarning by remember { mutableStateOf<String?>(null) }
+        var showRecurringDeleteWarning by remember { mutableStateOf<CalendarEvent?>(null) }
+        // Para edición de recurrentes: guardamos la instancia seleccionada hasta que el usuario elija
+        var recurringEditTarget by remember { mutableStateOf<CalendarEvent?>(null) }
 
         val currentMonth = remember { YearMonth.now() }
 
@@ -96,7 +99,7 @@ fun CalendarScreen(
             firstDayOfWeek = if (startWeekOn == "Monday") DayOfWeek.MONDAY else DayOfWeek.SUNDAY
         )
 
-        // Crítico 3: scroll al mes correcto cuando selectedDate cambia (ej. desde búsqueda de Agenda)
+        // Scroll al mes correcto cuando selectedDate cambia (ej. desde búsqueda de Agenda)
         LaunchedEffect(selectedDate) {
             val targetMonth = YearMonth.from(selectedDate)
             if (targetMonth != state.firstVisibleMonth.yearMonth) {
@@ -378,6 +381,11 @@ fun CalendarScreen(
                             confirmValueChange = { value ->
                                 if (value == SwipeToDismissBoxValue.EndToStart) {
                                     val capturedEvent = event
+                                    if (capturedEvent.recurrence != com.example.calendarapp.data.model.RecurrenceType.NONE) {
+                                        // Evento recurrente: mostrar diálogo de confirmación en vez de borrar directo
+                                        showRecurringDeleteWarning = capturedEvent
+                                        return@rememberSwipeToDismissBoxState false  // No confirmar el swipe todavía
+                                    }
                                     calendarViewModel.deleteEvent(event.id)
                                     haptic.performHapticFeedback(HapticFeedbackType.LongPress)
                                     coroutineScope.launch {
@@ -415,7 +423,14 @@ fun CalendarScreen(
                                     }
                                 }
                             ) {
-                                EventCard(event = event, theme = theme, lang = lang, onClick = { showDetailEvent = event }, onLongClick = { eventToEdit = event })
+                                EventCard(event = event, theme = theme, lang = lang,
+                                onClick = { showDetailEvent = event },
+                                onLongClick = {
+                                    if (event.recurrence != com.example.calendarapp.data.model.RecurrenceType.NONE)
+                                        recurringEditTarget = event
+                                    else
+                                        eventToEdit = event
+                                })
                             }
                         }
                     }
@@ -491,13 +506,17 @@ fun CalendarScreen(
                             "Conflicto con \"$conflictTitle\""
                         else
                             "Conflict with \"$conflictTitle\""
-                        coroutineScope.launch {
-                            snackbarHostState.showSnackbar(conflictWarning!!, duration = SnackbarDuration.Short)
+                        val warningMsg = conflictWarning // Capturar antes del coroutine para evitar NPE
+                        if (warningMsg != null) {
+                            coroutineScope.launch {
+                                snackbarHostState.showSnackbar(warningMsg, duration = SnackbarDuration.Short)
+                            }
                         }
                     }
-                    if (eventToEdit != null) {
+                    if (eventToEdit != null && eventToEdit!!.id != 0L) {
                         calendarViewModel.updateEvent(context, eventToEdit!!.id, newDate, title, time, config, colorHex, endTime, recurrence, allDay, loc, eventUrl, photo, soundUri)
                     } else {
+                        // id == 0 → nueva ocurrencia ("Solo esta vez") o evento nuevo
                         calendarViewModel.addEvent(context, newDate, title, time, config, colorHex, endTime, recurrence, allDay, loc, eventUrl, photo, soundUri)
                     }
                     haptic.performHapticFeedback(HapticFeedbackType.LongPress)
@@ -515,13 +534,99 @@ fun CalendarScreen(
             )
         }
 
-        // Crítico 4: Bottom Sheet de detalle de evento (tap simple en tarjeta)
+        // Diálogo de elección al editar evento recurrente (Bug 3 fix)
+        recurringEditTarget?.let { instanceEvent ->
+            AlertDialog(
+                onDismissRequest = { recurringEditTarget = null },
+                title = {
+                    Text(
+                        if (lang.contains("Español")) "Editar evento recurrente"
+                        else "Edit recurring event"
+                    )
+                },
+                text = {
+                    Text(
+                        if (lang.contains("Español"))
+                            "¿Qué deseas editar?"
+                        else
+                            "What would you like to edit?"
+                    )
+                },
+                confirmButton = {
+                    // "Toda la serie" → carga el evento ORIGINAL (con fecha de inicio real)
+                    TextButton(onClick = {
+                        val original = calendarViewModel.getOriginalEvent(instanceEvent.id)
+                        eventToEdit = original ?: instanceEvent
+                        showAddDialog = true
+                        recurringEditTarget = null
+                    }) {
+                        Text(if (lang.contains("Español")) "Toda la serie" else "Entire series")
+                    }
+                },
+                dismissButton = {
+                    // "Solo esta vez" → copia con id=0 y recurrencia NONE para crear nuevo evento
+                    TextButton(onClick = {
+                        eventToEdit = instanceEvent.copy(
+                            id = 0L,
+                            recurrence = com.example.calendarapp.data.model.RecurrenceType.NONE
+                        )
+                        showAddDialog = true
+                        recurringEditTarget = null
+                    }) {
+                        Text(if (lang.contains("Español")) "Solo esta vez" else "This occurrence only")
+                    }
+                }
+            )
+        }
+
+        // Diálogo de confirmación para eliminar evento recurrente (Bug 4 fix)
+        showRecurringDeleteWarning?.let { recurringEvent ->
+            AlertDialog(
+                onDismissRequest = { showRecurringDeleteWarning = null },
+                title = {
+                    Text(
+                        if (lang.contains("Español")) "Eliminar serie recurrente"
+                        else "Delete recurring series"
+                    )
+                },
+                text = {
+                    Text(
+                        if (lang.contains("Español"))
+                            "Este es un evento recurrente. Al eliminarlo se borrará toda la serie.\n¿Deseas continuar?"
+                        else
+                            "This is a recurring event. Deleting it will remove the entire series.\nDo you want to continue?"
+                    )
+                },
+                confirmButton = {
+                    TextButton(onClick = {
+                        calendarViewModel.deleteEvent(recurringEvent.id)
+                        showRecurringDeleteWarning = null
+                    }) {
+                        Text(
+                            if (lang.contains("Español")) "Eliminar todo" else "Delete all",
+                            color = MaterialTheme.colorScheme.error
+                        )
+                    }
+                },
+                dismissButton = {
+                    TextButton(onClick = { showRecurringDeleteWarning = null }) {
+                        Text(if (lang.contains("Español")) "Cancelar" else "Cancel")
+                    }
+                }
+            )
+        }
+
+        // Bottom Sheet de detalle de evento (tap simple en tarjeta)
         showDetailEvent?.let { detailEvent ->
             EventDetailSheet(
                 event = detailEvent,
                 onDismiss = { showDetailEvent = null },
                 onEdit = {
-                    eventToEdit = detailEvent
+                    if (detailEvent.recurrence != com.example.calendarapp.data.model.RecurrenceType.NONE) {
+                        recurringEditTarget = detailEvent
+                    } else {
+                        eventToEdit = detailEvent
+                    }
                     showDetailEvent = null
                 },
                 onDelete = {
@@ -597,7 +702,7 @@ fun EventCard(event: CalendarEvent, theme: AppTheme, lang: String = "English", o
 
             // MEJORADO: columna con día de semana encima del número
             val cardLocale = remember(lang) {
-                if (lang.contains("Español", ignoreCase = true)) Locale("es", "ES") else Locale.ENGLISH
+                if (lang.contains("Español", ignoreCase = true)) java.util.Locale.forLanguageTag("es-ES") else java.util.Locale.ENGLISH
             }
             Column(horizontalAlignment = Alignment.CenterHorizontally) {
                 Text(

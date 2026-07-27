@@ -10,13 +10,17 @@ interface EventDao {
     @Query("SELECT * FROM events")
     fun getAllEvents(): Flow<List<CalendarEvent>>
 
-    // Consulta por rango de fechas (Fase 3: rendimiento)
+    // Consulta por rango de fechas para mejorar rendimiento
     @Query("SELECT * FROM events WHERE date >= :startDate AND date <= :endDate")
     fun getEventsByDateRange(startDate: String, endDate: String): Flow<List<CalendarEvent>>
 
     // Solo eventos recurrentes (para expansión virtual sin cargar todos)
     @Query("SELECT * FROM events WHERE recurrence != 'NONE'")
     fun getRecurringEvents(): Flow<List<CalendarEvent>>
+
+    // Versión suspend para widgets (sin Flow)
+    @Query("SELECT * FROM events WHERE recurrence != 'NONE'")
+    suspend fun getRecurringEventsSync(): List<CalendarEvent>
 
     // ---> Consultas directas para widgets (suspend, no Flow) <---
     @Query("SELECT * FROM events")

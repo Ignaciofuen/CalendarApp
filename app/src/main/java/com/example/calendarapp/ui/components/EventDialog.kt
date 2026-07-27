@@ -31,7 +31,7 @@ import com.example.calendarapp.utils.AppStrings
 @Composable
 fun EventDialog(
     existingEvent: CalendarEvent?,
-    initialDate: LocalDate,          // ← Crítico 2: fecha editable
+    initialDate: LocalDate,
     onDismiss: () -> Unit,
     onConfirm: (LocalDate, String, LocalTime, NotificationConfig, String, String, RecurrenceType, Boolean, String, String, String, String) -> Unit,
     onDelete: () -> Unit,
@@ -68,7 +68,7 @@ fun EventDialog(
     var notifyType by remember { mutableStateOf(existingEvent?.notification?.type ?: NotificationType.SAME_DAY) }
     var selectedColorHex by remember { mutableStateOf(existingEvent?.colorHex ?: "") }
     var selectedRecurrence by remember { mutableStateOf(existingEvent?.recurrence ?: RecurrenceType.NONE) }
-    // Crítico 2: fecha seleccionada del evento (editable)
+    // Fecha seleccionada del evento
     var selectedEventDate by remember { mutableStateOf(initialDate) }
     var showDatePickerDialog by remember { mutableStateOf(false) }
 
@@ -81,7 +81,12 @@ fun EventDialog(
         androidx.activity.result.contract.ActivityResultContracts.StartActivityForResult()
     ) { result ->
         if (result.resultCode == android.app.Activity.RESULT_OK) {
-            val uri = result.data?.getParcelableExtra<android.net.Uri>(android.media.RingtoneManager.EXTRA_RINGTONE_PICKED_URI)
+            val uri = if (android.os.Build.VERSION.SDK_INT >= android.os.Build.VERSION_CODES.TIRAMISU) {
+                result.data?.getParcelableExtra(android.media.RingtoneManager.EXTRA_RINGTONE_PICKED_URI, android.net.Uri::class.java)
+            } else {
+                @Suppress("DEPRECATION")
+                result.data?.getParcelableExtra<android.net.Uri>(android.media.RingtoneManager.EXTRA_RINGTONE_PICKED_URI)
+            }
             notificationSoundUri = uri?.toString() ?: ""
         }
     }
@@ -119,7 +124,7 @@ fun EventDialog(
                     // Título
                     TextField(value = title, onValueChange = { title = it }, placeholder = { Text(AppStrings.get("new_event", lang)) })
 
-                    // Fecha — selector con DatePickerDialog (Crítico 2)
+                    // Fecha - selector con DatePickerDialog
                     HorizontalDivider(color = Color.Gray.copy(alpha = 0.3f))
                     Row(
                         modifier = Modifier
@@ -135,7 +140,7 @@ fun EventDialog(
                                 if (isSpanish) "Fecha" else "Date",
                                 color = theme.getLabelColor(), fontSize = 12.sp
                             )
-                            val dl = if (isSpanish) java.util.Locale("es", "ES") else java.util.Locale.ENGLISH
+                            val dl = if (isSpanish) java.util.Locale.forLanguageTag("es-ES") else java.util.Locale.ENGLISH
                             val dn = selectedEventDate.dayOfWeek
                                 .getDisplayName(java.time.format.TextStyle.FULL, dl)
                                 .replaceFirstChar { it.uppercase() }

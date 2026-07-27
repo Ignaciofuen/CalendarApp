@@ -3,7 +3,7 @@ package com.example.calendarapp
 import android.Manifest
 import android.app.NotificationChannel
 import android.app.NotificationManager
-import android.content.Context
+
 import android.content.pm.PackageManager
 import android.os.Build
 import android.os.Bundle
@@ -26,7 +26,6 @@ import androidx.compose.foundation.layout.Box
 import androidx.compose.foundation.layout.fillMaxSize
 import androidx.compose.foundation.layout.padding
 import androidx.compose.ui.input.pointer.pointerInput
-import androidx.compose.ui.platform.LocalDensity
 import androidx.compose.ui.unit.dp
 import androidx.compose.material3.MaterialTheme
 import androidx.compose.material3.Scaffold
@@ -53,9 +52,6 @@ class MainActivity : AppCompatActivity() {
     override fun onCreate(savedInstanceState: Bundle?) {
         super.onCreate(savedInstanceState)
 
-        // Habilita edge-to-edge: la app dibuja detrás de las barras del sistema.
-        // El BottomNavigationBar usará WindowInsets para subirse automáticamente
-        // cuando el usuario tiene activos los botones de navegación del sistema.
         enableEdgeToEdge()
 
         createNotificationChannel()
@@ -115,7 +111,7 @@ class MainActivity : AppCompatActivity() {
                     try {
                         val date = java.time.LocalDate.parse(dateExtra)
                         calendarViewModel.onDateSelected(date)
-                    } catch (e: Exception) { /* fecha inválida, ignorar */ }
+                    } catch (_: Exception) { /* fecha inválida, ignorar */ }
                 }
             }
 
@@ -302,7 +298,7 @@ class MainActivity : AppCompatActivity() {
             }
 
             val notificationManager: NotificationManager =
-                getSystemService(Context.NOTIFICATION_SERVICE) as NotificationManager
+                getSystemService(NOTIFICATION_SERVICE) as NotificationManager
             notificationManager.createNotificationChannel(channel)
         }
     }

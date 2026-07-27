@@ -1,19 +1,21 @@
-<?xml version="1.0" encoding="utf-8"?><!--
-   Sample data extraction rules file; uncomment and customize as necessary.
-   See https://developer.android.com/about/versions/12/backup-restore#xml-changes
-   for details.
--->
+<?xml version="1.0" encoding="utf-8"?>
 <data-extraction-rules>
+    <!-- Backup en la nube (Google Drive) — API 31+ -->
     <cloud-backup>
-        <!-- TODO: Use <include> and <exclude> to control what is backed up.
-        <include .../>
-        <exclude .../>
-        -->
+        <include domain="sharedpref" path="theme_preferences"/>
+        <include domain="sharedpref" path="settings_preferences"/>
+        <include domain="database" path="calendar_database"/>
+        <include domain="database" path="calendar_database-wal"/>
+        <include domain="database" path="calendar_database-shm"/>
+        <include domain="file" path="backgrounds"/>
     </cloud-backup>
-    <!--
+    <!-- Transferencia entre dispositivos (cable / migración) -->
     <device-transfer>
-        <include .../>
-        <exclude .../>
+        <include domain="sharedpref" path="theme_preferences"/>
+        <include domain="sharedpref" path="settings_preferences"/>
+        <include domain="database" path="calendar_database"/>
+        <include domain="database" path="calendar_database-wal"/>
+        <include domain="database" path="calendar_database-shm"/>
+        <include domain="file" path="backgrounds"/>
     </device-transfer>
-    -->
 </data-extraction-rules>

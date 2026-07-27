@@ -79,8 +79,8 @@ object DataManager {
 
     // ─── BACKUP DB ──────────────────────────────────────────────────
     fun backupDatabase(context: Context): Result<File> = runCatching {
-        // Cerramos la instancia antes de copiar para evitar corrupción
-        AppDatabase.closeInstance()
+        // NOTA: NO cerramos la instancia de Room porque causaría crash en los observers activos.
+        // El WAL checkpoint garantiza que todos los datos estén escritos antes de copiar.
 
         val dbFile = context.getDatabasePath("calendar_database")
         val dir = context.getExternalFilesDir(Environment.DIRECTORY_DOCUMENTS)
@@ -268,10 +268,16 @@ object DataManager {
                 val date: LocalDate? = try {
                     if (rawDate.startsWith("--")) {
                         val parts = rawDate.removePrefix("--").split("-")
-                        LocalDate.of(currentYear, parts[0].toInt(), parts[1].toInt())
+                        var month = parts[0].toInt()
+                        var day = parts[1].toInt()
+                        // Feb 29 en año no bisiesto → usar Feb 28
+                        if (month == 2 && day == 29 && !java.time.Year.isLeap(currentYear.toLong())) day = 28
+                        LocalDate.of(currentYear, month, day)
                     } else {
                         val d = LocalDate.parse(rawDate)
-                        d.withYear(currentYear)
+                        // Misma protección para el formato yyyy-MM-dd
+                        val targetDay = if (d.monthValue == 2 && d.dayOfMonth == 29 && !java.time.Year.isLeap(currentYear.toLong())) 28 else d.dayOfMonth
+                        LocalDate.of(currentYear, d.monthValue, targetDay)
                     }
                 } catch (e: Exception) { null }
 

@@ -9,7 +9,7 @@ class EventRepository(private val eventDao: EventDao) {
     // Obtiene todos los eventos de la base de datos de Room en tiempo real
     val allEvents: Flow<List<CalendarEvent>> = eventDao.getAllEvents()
 
-    // Consulta por rango de fechas (Fase 3: rendimiento)
+    // Consulta por rango de fechas
     fun getEventsByDateRange(startDate: String, endDate: String): Flow<List<CalendarEvent>> {
         return eventDao.getEventsByDateRange(startDate, endDate)
     }

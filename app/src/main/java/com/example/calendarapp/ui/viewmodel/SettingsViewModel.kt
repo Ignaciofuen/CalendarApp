@@ -97,7 +97,7 @@ class SettingsViewModel(application: Application) : AndroidViewModel(application
         val localeCode = if (language.contains("Español", ignoreCase = true)) "es" else "en"
 
         // Cambiamos el Locale global para que funciones como getDisplayName funcionen
-        val locale = Locale(localeCode)
+        val locale = java.util.Locale.forLanguageTag(localeCode)
         Locale.setDefault(locale)
 
         // Notificamos al sistema operativo para que cambie los recursos XML

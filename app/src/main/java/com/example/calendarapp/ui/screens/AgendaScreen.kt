@@ -62,7 +62,7 @@ fun AgendaScreen(
     calendarViewModel: CalendarViewModel = viewModel(),
     themeViewModel: ThemeViewModel = viewModel(),
     settingsViewModel: SettingsViewModel = viewModel(),
-    navController: NavController? = null  // Crítico 3: para navegar al calendario desde búsqueda
+    navController: NavController? = null
 ) {
     val lang by settingsViewModel.currentLanguage.collectAsState()
     val startWeekOn by settingsViewModel.startWeekOn.collectAsState()
@@ -71,7 +71,7 @@ fun AgendaScreen(
         val configuration = LocalConfiguration.current
 
         val currentLocale = remember(lang) {
-            if (lang.contains("Español", ignoreCase = true)) Locale("es", "ES") else Locale.ENGLISH
+            if (lang.contains("Español", ignoreCase = true)) java.util.Locale.forLanguageTag("es-ES") else java.util.Locale.ENGLISH
         }
 
         val eventsMap by calendarViewModel.events.collectAsState()
@@ -470,7 +470,7 @@ fun AgendaScreen(
                                         lang = lang,
                                         isPast = isPast,
                                         onAutoSaveNote = { calendarViewModel.updateEventNote(event, it) },
-                                        // Crítico 3: si hay búsqueda activa, el tap navega al calendario
+                                        // Si hay búsqueda activa, el tap navega al calendario
                                         onNavigate = if (searchQuery.isNotBlank() && navController != null) {
                                             {
                                                 calendarViewModel.onDateSelected(event.date)
@@ -514,7 +514,7 @@ fun AgendaEventCard(
     lang: String,
     isPast: Boolean = false,
     onAutoSaveNote: (String) -> Unit,
-    onNavigate: (() -> Unit)? = null  // Crítico 3: navega al calendario si está en modo búsqueda
+    onNavigate: (() -> Unit)? = null
 ) {
     var expanded by remember { mutableStateOf(false) }
     var noteInput by remember { mutableStateOf(event.note) }
@@ -579,7 +579,7 @@ fun AgendaEventCard(
             Row(verticalAlignment = Alignment.CenterVertically) {
                 val locale = remember(lang) {
                     if (lang.contains("Español", ignoreCase = true))
-                        java.util.Locale("es", "ES") else java.util.Locale.ENGLISH
+                        java.util.Locale.forLanguageTag("es-ES") else java.util.Locale.ENGLISH
                 }
                 Box(
                     modifier = Modifier

@@ -7,6 +7,7 @@ import androidx.compose.foundation.shape.RoundedCornerShape
 import androidx.compose.material.icons.Icons
 import androidx.compose.material.icons.filled.DateRange
 import androidx.compose.material.icons.filled.KeyboardArrowRight
+import androidx.compose.material.icons.automirrored.filled.KeyboardArrowRight
 import androidx.compose.material.icons.filled.NightsStay
 import androidx.compose.material.icons.filled.WbSunny
 import androidx.compose.material3.*
@@ -264,7 +265,7 @@ fun SettingsScreen(
                             fontFamily = theme.getFontFamily()
                         )
                     }
-                    Icon(Icons.Default.KeyboardArrowRight, contentDescription = if (currentLang.contains("Español")) "Cambiar" else "Change", tint = Color.Gray)
+                    Icon(Icons.AutoMirrored.Filled.KeyboardArrowRight, contentDescription = if (currentLang.contains("Español")) "Cambiar" else "Change", tint = Color.Gray)
                 }
             }
             Spacer(modifier = Modifier.height(24.dp))
@@ -629,7 +630,7 @@ fun DataActionRow(label: String, sublabel: String, theme: AppTheme, onClick: () 
             Text(label, color = theme.getMainTextColor(), fontWeight = FontWeight.SemiBold, fontSize = (14 * theme.globalTextScale).sp, fontFamily = theme.getFontFamily())
             Text(sublabel, color = theme.getLabelColor(), fontSize = (12 * theme.globalTextScale).sp, fontFamily = theme.getFontFamily())
         }
-        Icon(Icons.Default.KeyboardArrowRight, contentDescription = "Navigate", tint = Color.Gray)
+        Icon(Icons.AutoMirrored.Filled.KeyboardArrowRight, contentDescription = "Navigate", tint = Color.Gray)
     }
 }
 
